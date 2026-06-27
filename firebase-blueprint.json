@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A task with a deadline and progress status",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the task"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title or description of the task"
+        },
+        "due": {
+          "type": "string",
+          "description": "Due date or time expression, e.g. today 6pm or tomorrow"
+        },
+        "progress": {
+          "type": "integer",
+          "description": "Progress percentage from 0 to 100"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Priority level of the task"
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the task is completed"
+        }
+      },
+      "required": ["id", "title", "due", "progress", "priority"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A skeuomorphic handwritten note supporting Markdown formatting",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the note"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the note"
+        },
+        "content": {
+          "type": "string",
+          "description": "Markdown formatted content of the note"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last update"
+        }
+      },
+      "required": ["id", "title", "content", "updatedAt"]
+    },
+    "UserSession": {
+      "title": "UserSession",
+      "description": "The state of the user's pocket planner, including tasks, calendar, and energy levels.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The user's unique ID for sync"
+        },
+        "username": {
+          "type": "string",
+          "description": "The display name of the user"
+        },
+        "tasks": {
+          "type": "array",
+          "description": "List of active tasks"
+        },
+        "calendarToday": {
+          "type": "array",
+          "description": "List of scheduled calendar events for today"
+        },
+        "energyLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Current energy state of the user"
+        },
+        "currentTime": {
+          "type": "string",
+          "description": "The reference wall-clock time"
+        },
+        "burnoutStreak": {
+          "type": "integer",
+          "description": "Number of consecutive days of missed tasks, used for burnout risk alerts"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last update"
+        },
+        "aiReport": {
+          "type": "object",
+          "description": "Cached or latest AI Triage report for fast display"
+        },
+        "notes": {
+          "type": "array",
+          "description": "List of skeuomorphic handwritten notes"
+        }
+      },
+      "required": ["userId", "username", "tasks", "calendarToday", "energyLevel"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserSession",
+      "description": "Durable user planner document, synced in real-time across devices using their Pocket ID."
+    }
+  }
+}

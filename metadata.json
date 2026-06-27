@@ -1,0 +1,6 @@
+{
+  "name": "DeadlineAI",
+  "description": "A proactive AI productivity companion that triages tasks, detects deadline risks, and auto-generates realistic time-block schedules based on your energy level.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

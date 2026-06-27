@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Architects+Daughter&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-handwritten: "Architects Daughter", cursive;
+}
+
+/* Custom retro/skeuomorphic utility classes */
+@layer utilities {
+  .skeuo-panel-shadow {
+    box-shadow: 8px 8px 0px 0px rgba(0, 0, 0, 1);
+  }
+  .skeuo-button-shadow {
+    box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+  }
+  .skeuo-button-shadow-active {
+    box-shadow: 1px 1px 0px 0px rgba(0, 0, 0, 1);
+  }
+  .skeuo-inset-shadow {
+    box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.4);
+  }
+  .lcd-glow {
+    text-shadow: 0 0 2px rgba(0, 220, 0, 0.5);
+  }
+}
+
+/* Notebook paper texture background */
+.notebook-paper {
+  background-color: #fcfbeb;
+  background-image: linear-gradient(#e1e0d3 1px, transparent 1px);
+  background-size: 100% 2rem;
+  line-height: 2rem;
+  position: relative;
+}
+
+.notebook-paper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.5rem;
+  width: 2px;
+  background-color: #ff9999;
+}
+
+/* Leather texture effect using CSS circles */
+.leather-grain {
+  background-color: #2b2b2b;
+  background-image: 
+    radial-gradient(circle, #1a1a1a 8%, transparent 8%),
+    radial-gradient(circle, #1f1f1f 8%, transparent 8%);
+  background-size: 4px 4px;
+  background-position: 0 0, 2px 2px;
+}
+
+/* Soft blink animation for alerts */
+@keyframes pulse-fast {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.blink-fast {
+  animation: pulse-fast 1s infinite;
+}
+
+/* Audio alert styling (visual-only click/beep signals) */
+.click-beep {
+  transition: transform 0.05s ease-in-out;
+}
+.click-beep:active {
+  transform: scale(0.97);
+}

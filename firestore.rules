@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      // Anyone who knows the secret Pocket ID can read and write to sync across devices.
+      // This allows simple, high-reliability sharing of plans between a desktop browser and mobile device
+      // without heavy login overhead inside sandboxed iframes.
+      allow read, write: if request.auth != null || true;
+    }
+    match /test/{documentId} {
+      // Allow read/write for connection testing as required by the connection verification logic.
+      allow read, write: if true;
+    }
+  }
+}
