@@ -24,13 +24,39 @@ import {
   CheckCircle,
   HelpCircle,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from "lucide-react";
 
 interface NotesManagerProps {
   session: UserSession;
   updateSessionInCloud: (updatedFields: Partial<UserSession>) => Promise<void>;
   triggerBleep: () => void;
+}
+
+interface ExtractedTask {
+  id: string;
+  title: string;
+  due: string;
+  priority: "low" | "medium" | "high";
+  estimatedEffort: number;
+  predictedEffort: number;
+  underestimationRisk: boolean;
+  category: string;
+  selected: boolean;
+}
+
+interface ExtractedEvent {
+  id: string;
+  text: string;
+  selected: boolean;
+}
+
+interface NotesAISuggestions {
+  tasks: ExtractedTask[];
+  calendarEvents: ExtractedEvent[];
+  parsedSummary: string;
+  isOpen: boolean;
 }
 
 export default function NotesManager({
@@ -56,18 +82,8 @@ export default function NotesManager({
   const [pendingAction, setPendingAction] = useState<{ type: "close" | "switch" | "create"; targetId?: string } | null>(null);
 
   // AI Scheduling Suggestion state
-  const [scheduleSuggestion, setScheduleSuggestion] = useState<{
-    detectedTerm: string;
-    prefilledTitle: string;
-    suggestedType: "task" | "calendar";
-    isOpen: boolean;
-  } | null>(null);
-
-  // New Schedule Item state
-  const [suggestedItemTitle, setSuggestedItemTitle] = useState("");
-  const [suggestedItemTimeOrDue, setSuggestedItemTimeOrDue] = useState("today 5pm");
-  const [suggestedItemCategory, setSuggestedItemCategory] = useState("General");
-  const [suggestedItemPriority, setSuggestedItemPriority] = useState<"low" | "medium" | "high">("medium");
+  const [aiSuggestions, setAiSuggestions] = useState<NotesAISuggestions | null>(null);
+  const [isAiParsing, setIsAiParsing] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -143,26 +159,6 @@ export default function NotesManager({
     }
   };
 
-  // Scan text for date/time/schedule markers
-  const scanForSchedules = (text: string): string | null => {
-    // Regex for basic date/time mentions
-    const markers = [
-      /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
-      /\b\d{1,2}\s*(?:am|pm|am|pm)\b/i,
-      /\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/i,
-      /\b(?:at|by)\s+\d{1,2}\b/i,
-      /\b(schedule|meeting|deadline|appt|appointment|calendar|call)\b/i
-    ];
-
-    for (const regex of markers) {
-      const match = text.match(regex);
-      if (match) {
-        return match[0];
-      }
-    }
-    return null;
-  };
-
   // Save the note
   const handleSaveNote = async () => {
     if (!activeNoteId) return;
@@ -184,19 +180,119 @@ export default function NotesManager({
     setOriginalTitle(editorTitle);
     setOriginalContent(editorContent);
 
-    // Scan for schedules suggestion
-    const mention = scanForSchedules(editorContent) || scanForSchedules(editorTitle);
-    if (mention) {
-      // Show AI suggestion dialog
-      setSuggestedItemTitle(editorTitle.trim());
-      setSuggestedItemTimeOrDue(mention.toLowerCase() === "meeting" || mention.toLowerCase() === "schedule" ? "today 5pm" : mention);
-      setScheduleSuggestion({
-        detectedTerm: mention,
-        prefilledTitle: editorTitle.trim(),
-        suggestedType: mention.toLowerCase().includes("meet") ? "calendar" : "task",
-        isOpen: true
-      });
+    // AI Intelligent Time-Block Extraction
+    const hasTriggers = /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|am|pm|\d{1,2}:\d{2}|meeting|schedule|appt|call|deadline)\b/i.test(editorContent);
+    if (hasTriggers) {
+      setIsAiParsing(true);
+      try {
+        const response = await fetch("/api/parse-nlp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rawInput: `Note Title: ${editorTitle}\n\nNote Content:\n${editorContent}` })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const extractedTasks = (data.tasks || []).map((t: any, index: number) => ({
+            ...t,
+            id: `ext-task-${Date.now()}-${index}`,
+            selected: true
+          }));
+          const extractedEvents = (data.calendarEvents || []).map((e: any, index: number) => ({
+            id: `ext-evt-${Date.now()}-${index}`,
+            text: e,
+            selected: true
+          }));
+
+          if (extractedTasks.length > 0 || extractedEvents.length > 0) {
+            setAiSuggestions({
+              tasks: extractedTasks,
+              calendarEvents: extractedEvents,
+              parsedSummary: data.parsedSummary || "Detected active references.",
+              isOpen: true
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse schedules via AI:", err);
+      } finally {
+        setIsAiParsing(false);
+      }
     }
+  };
+
+  const toggleTaskSelected = (id: string) => {
+    if (!aiSuggestions) return;
+    triggerBleep();
+    setAiSuggestions({
+      ...aiSuggestions,
+      tasks: aiSuggestions.tasks.map(t => t.id === id ? { ...t, selected: !t.selected } : t)
+    });
+  };
+
+  const toggleEventSelected = (id: string) => {
+    if (!aiSuggestions) return;
+    triggerBleep();
+    setAiSuggestions({
+      ...aiSuggestions,
+      calendarEvents: aiSuggestions.calendarEvents.map(e => e.id === id ? { ...e, selected: !e.selected } : e)
+    });
+  };
+
+  const updateTaskField = (id: string, field: string, value: any) => {
+    if (!aiSuggestions) return;
+    setAiSuggestions({
+      ...aiSuggestions,
+      tasks: aiSuggestions.tasks.map(t => t.id === id ? { ...t, [field]: value } : t)
+    });
+  };
+
+  const updateEventText = (id: string, value: string) => {
+    if (!aiSuggestions) return;
+    setAiSuggestions({
+      ...aiSuggestions,
+      calendarEvents: aiSuggestions.calendarEvents.map(e => e.id === id ? { ...e, text: value } : e)
+    });
+  };
+
+  const handleRegisterSelected = async () => {
+    if (!aiSuggestions) return;
+    triggerBleep();
+
+    // 1. Filter selected tasks and map to session Task format
+    const selectedTasks = aiSuggestions.tasks
+      .filter(t => t.selected)
+      .map(t => {
+        const est = Number(t.estimatedEffort) || 1.5;
+        const task: Task = {
+          id: t.id || "task-" + Date.now() + Math.random(),
+          title: t.title.trim() || "Task from Note",
+          due: t.due || "today",
+          progress: 0,
+          priority: t.priority || "medium",
+          completed: false,
+          estimatedEffort: est,
+          predictedEffort: Number(t.predictedEffort) || (est * 1.5),
+          underestimationRisk: t.underestimationRisk ?? false,
+          category: t.category || "General"
+        };
+        return task;
+      });
+
+    // 2. Filter selected calendar events
+    const selectedEvents = aiSuggestions.calendarEvents
+      .filter(e => e.selected)
+      .map(e => e.text);
+
+    // 3. Update session in cloud
+    const updatedTasks = [...session.tasks, ...selectedTasks];
+    const updatedCal = [...session.calendarToday, ...selectedEvents];
+
+    await updateSessionInCloud({
+      tasks: updatedTasks,
+      calendarToday: updatedCal
+    });
+
+    setAiSuggestions(null);
   };
 
   // Inject Markdown helpers into editor at selection or cursor
@@ -307,35 +403,6 @@ export default function NotesManager({
   const handleDialogCancel = () => {
     triggerBleep();
     setPendingAction(null);
-  };
-
-  // Add the suggested item to tasks or schedule
-  const handleAddSuggestedItem = async () => {
-    triggerBleep();
-    if (scheduleSuggestion?.suggestedType === "task") {
-      // Add as a Task
-      const est = 1.5;
-      const task: Task = {
-        id: "task-" + Date.now(),
-        title: suggestedItemTitle.trim() || "Task from Note",
-        due: suggestedItemTimeOrDue || "today",
-        progress: 0,
-        priority: suggestedItemPriority,
-        completed: false,
-        estimatedEffort: est,
-        predictedEffort: est * 1.5,
-        underestimationRisk: false,
-        category: suggestedItemCategory
-      };
-      const updatedTasks = [...session.tasks, task];
-      await updateSessionInCloud({ tasks: updatedTasks });
-    } else {
-      // Add as Calendar Event
-      const textEvent = `${suggestedItemTimeOrDue.toUpperCase()} — ${suggestedItemTitle.trim()}`;
-      const updatedCal = [...session.calendarToday, textEvent];
-      await updateSessionInCloud({ calendarToday: updatedCal });
-    }
-    setScheduleSuggestion(null);
   };
 
   return (
@@ -559,7 +626,27 @@ export default function NotesManager({
             ) : (
               <div className="markdown-body p-4 overflow-auto max-h-56 min-h-56 text-zinc-800 text-xs font-mono space-y-2 select-text leading-relaxed">
                 {editorContent.trim() ? (
-                  <Markdown>{editorContent}</Markdown>
+                  <Markdown
+                    components={{
+                      h1: ({ node, ...props }) => <h1 className="text-base font-bold mt-3 mb-1.5 border-b-2 border-black pb-0.5 text-black uppercase" {...props} />,
+                      h2: ({ node, ...props }) => <h2 className="text-sm font-bold mt-2.5 mb-1 border-b border-black/10 pb-0.5 text-zinc-900 uppercase" {...props} />,
+                      h3: ({ node, ...props }) => <h3 className="text-xs font-bold mt-2 mb-1 text-zinc-800 uppercase" {...props} />,
+                      h4: ({ node, ...props }) => <h4 className="text-[11px] font-bold mt-2 mb-1 text-zinc-700 uppercase" {...props} />,
+                      ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-2 space-y-1 text-zinc-800" {...props} />,
+                      ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-2 space-y-1 text-zinc-800" {...props} />,
+                      li: ({ node, ...props }) => <li className="list-item pl-0.5" {...props} />,
+                      p: ({ node, ...props }) => <p className="my-1.5" {...props} />,
+                      strong: ({ node, ...props }) => <strong className="font-extrabold text-black" {...props} />,
+                      em: ({ node, ...props }) => <em className="italic text-zinc-700" {...props} />,
+                      code: ({ node, className, children, ...props }) => (
+                        <code className="bg-[#f0f0e8] px-1 py-0.5 border border-black/10 rounded font-mono text-[11px] text-red-700 break-all" {...props}>
+                          {children}
+                        </code>
+                      ),
+                    }}
+                  >
+                    {editorContent}
+                  </Markdown>
                 ) : (
                   <p className="text-zinc-400 italic">No note content written yet. Switch to "MD" tab and type ink.</p>
                 )}
@@ -589,6 +676,7 @@ export default function NotesManager({
                 variant="secondary"
                 size="sm"
                 className="py-1 px-3 text-xs"
+                disabled={isAiParsing}
               >
                 <span>CLOSE NOTE</span>
               </SkeuoButton>
@@ -597,10 +685,15 @@ export default function NotesManager({
                 onClick={handleSaveNote}
                 variant="success"
                 size="sm"
-                className="py-1.5 px-4 font-bold text-xs"
+                className="py-1.5 px-4 font-bold text-xs flex items-center gap-1.5"
+                disabled={isAiParsing}
               >
-                <Save className="w-3.5 h-3.5 mr-1" />
-                <span>SAVE CHANGES</span>
+                {isAiParsing ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-950" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
+                <span>{isAiParsing ? "PARSING WITH AI..." : "SAVE CHANGES"}</span>
               </SkeuoButton>
             </div>
           </div>
@@ -654,8 +747,8 @@ export default function NotesManager({
         </div>
       )}
 
-      {/* ================= MODAL: SCHEDULE SUGGESTION FROM NOTES ================= */}
-      {scheduleSuggestion?.isOpen && (
+      {/* ================= MODAL: MULTI-ITEM SCHEDULE SUGGESTIONS FROM NOTES ================= */}
+      {aiSuggestions?.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 font-mono">
           <div className="w-full max-w-md border-4 border-black bg-white rounded-lg shadow-[8px_8px_0px_#000] p-4 space-y-4">
             
@@ -664,139 +757,136 @@ export default function NotesManager({
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
                 <span className="text-xs font-extrabold text-amber-950 uppercase">
-                  Schedule Mentor Detected!
+                  Multi-item Agenda Extracted!
                 </span>
               </div>
               <button
                 type="button"
-                onClick={() => setScheduleSuggestion(null)}
+                onClick={() => setAiSuggestions(null)}
                 className="text-amber-950 hover:text-black"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-2 bg-[#f9f8f0] border border-black/10 p-2.5 rounded text-xs text-zinc-800">
-              <p className="leading-snug">
-                You saved a note mentioning a schedule trigger: <span className="bg-amber-100 text-amber-950 px-1 font-bold border border-amber-400 rounded">"{scheduleSuggestion.detectedTerm}"</span>.
-              </p>
-              <p className="font-medium text-[11px] text-zinc-500">
-                Would you like to register this reference as an item in your workspace?
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {/* Event/Task Type Toggle */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-gray-600 font-bold block uppercase">ITEM ARCHITECTURE</label>
-                <div className="grid grid-cols-2 gap-2 h-7">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerBleep();
-                      setScheduleSuggestion(prev => prev ? { ...prev, suggestedType: "task" } : null);
-                    }}
-                    className={`font-mono text-[10px] font-bold border-2 border-black rounded flex items-center justify-center gap-1 transition-colors ${
-                      scheduleSuggestion.suggestedType === "task"
-                        ? "bg-black text-[#e5c543]"
-                        : "bg-white text-zinc-700 hover:bg-zinc-50"
-                    }`}
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>WORK TASK</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerBleep();
-                      setScheduleSuggestion(prev => prev ? { ...prev, suggestedType: "calendar" } : null);
-                    }}
-                    className={`font-mono text-[10px] font-bold border-2 border-black rounded flex items-center justify-center gap-1 transition-colors ${
-                      scheduleSuggestion.suggestedType === "calendar"
-                        ? "bg-black text-[#e5c543]"
-                        : "bg-white text-zinc-700 hover:bg-zinc-50"
-                    }`}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>CALENDAR AGENDA</span>
-                  </button>
+            {/* Jarvis Speech Summary Brief */}
+            {aiSuggestions.parsedSummary && (
+              <div className="bg-zinc-950 text-emerald-400 p-3 rounded border-2 border-black font-mono text-[11px] leading-tight shadow-[3px_3px_0px_#000]">
+                <div className="text-[9px] text-zinc-500 font-bold uppercase mb-1 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  <span>Jarvis Intelligence Briefing:</span>
                 </div>
+                {aiSuggestions.parsedSummary}
               </div>
+            )}
 
-              {/* Title Field */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-gray-600 font-bold block uppercase">ITEM TITLE</label>
-                <input
-                  type="text"
-                  value={suggestedItemTitle}
-                  onChange={(e) => setSuggestedItemTitle(e.target.value)}
-                  className="w-full font-mono text-xs border-2 border-black p-2 rounded bg-white text-black focus:outline-none"
-                  placeholder="e.g. Discuss note contents with Priya"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {/* Date or Time string */}
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-600 font-bold block uppercase">
-                    {scheduleSuggestion.suggestedType === "task" ? "DUE TIME" : "EVENT SLOT"}
-                  </label>
-                  <input
-                    type="text"
-                    value={suggestedItemTimeOrDue}
-                    onChange={(e) => setSuggestedItemTimeOrDue(e.target.value)}
-                    className="w-full font-mono text-xs border-2 border-black p-2 rounded bg-white text-black focus:outline-none"
-                    placeholder="e.g. tomorrow 5pm or 2:00 PM"
-                  />
+            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+              {/* Extracted Tasks Section */}
+              {aiSuggestions.tasks.length > 0 && (
+                <div className="space-y-1.5">
+                  <h5 className="text-[10px] text-zinc-600 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Extracted Planner Tasks ({aiSuggestions.tasks.filter(t => t.selected).length}/{aiSuggestions.tasks.length})</span>
+                  </h5>
+                  <div className="space-y-2">
+                    {aiSuggestions.tasks.map(t => (
+                      <div key={t.id} className={`border-2 border-black p-2 bg-[#fbfbfa] rounded shadow-[2px_2px_0px_#000] flex flex-col gap-1.5 transition-opacity ${t.selected ? "opacity-100" : "opacity-60"}`}>
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={t.selected}
+                            onChange={() => toggleTaskSelected(t.id)}
+                            className="mt-1 cursor-pointer accent-black h-4 w-4"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="text"
+                              value={t.title}
+                              onChange={(e) => updateTaskField(t.id, "title", e.target.value)}
+                              className="w-full font-mono font-bold text-xs bg-transparent border-b border-dashed border-black/25 focus:border-black focus:outline-none pb-0.5 text-black"
+                            />
+                          </div>
+                        </div>
+                        {t.selected && (
+                          <div className="grid grid-cols-2 gap-2 pl-6">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[8px] text-zinc-500 font-bold uppercase">DUE DATE</span>
+                              <input
+                                type="text"
+                                value={t.due}
+                                onChange={(e) => updateTaskField(t.id, "due", e.target.value)}
+                                className="font-mono text-[10px] border border-black/20 px-1 py-0.5 rounded bg-white text-black focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[8px] text-zinc-500 font-bold uppercase">PRIORITY</span>
+                              <select
+                                value={t.priority}
+                                onChange={(e) => updateTaskField(t.id, "priority", e.target.value)}
+                                className="font-mono text-[10px] border border-black/20 px-1 py-0.5 rounded bg-white text-black focus:outline-none"
+                              >
+                                <option value="low">LOW</option>
+                                <option value="medium">MEDIUM</option>
+                                <option value="high">HIGH</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              )}
 
-                {scheduleSuggestion.suggestedType === "task" ? (
-                  /* Task priority */
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-600 font-bold block uppercase">PRIORITY</label>
-                    <select
-                      value={suggestedItemPriority}
-                      onChange={(e) => setSuggestedItemPriority(e.target.value as any)}
-                      className="w-full font-mono text-xs border-2 border-black p-2 rounded bg-white text-black cursor-pointer focus:outline-none h-[38px]"
-                    >
-                      <option value="low">LOW</option>
-                      <option value="medium">MEDIUM</option>
-                      <option value="high">HIGH</option>
-                    </select>
+              {/* Extracted Calendar Events Section */}
+              {aiSuggestions.calendarEvents.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <h5 className="text-[10px] text-zinc-600 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Calendar Agenda Slots ({aiSuggestions.calendarEvents.filter(e => e.selected).length}/{aiSuggestions.calendarEvents.length})</span>
+                  </h5>
+                  <div className="space-y-2">
+                    {aiSuggestions.calendarEvents.map(e => (
+                      <div key={e.id} className={`border-2 border-black p-2 bg-[#f0f9f4] rounded shadow-[2px_2px_0px_#000] flex items-start gap-2 transition-opacity ${e.selected ? "opacity-100" : "opacity-60"}`}>
+                        <input
+                          type="checkbox"
+                          checked={e.selected}
+                          onChange={() => toggleEventSelected(e.id)}
+                          className="mt-1 cursor-pointer accent-black h-4 w-4"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <input
+                            type="text"
+                            value={e.text}
+                            onChange={(evt) => updateEventText(e.id, evt.target.value)}
+                            className="w-full font-mono text-xs bg-transparent border-b border-dashed border-black/25 focus:border-black focus:outline-none pb-0.5 text-black"
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  /* Event category */
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-600 font-bold block uppercase">CATEGORY</label>
-                    <input
-                      type="text"
-                      value={suggestedItemCategory}
-                      onChange={(e) => setSuggestedItemCategory(e.target.value)}
-                      className="w-full font-mono text-xs border-2 border-black p-2 rounded bg-white text-black focus:outline-none h-[38px]"
-                      placeholder="e.g. Meeting, Gym"
-                    />
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Action Bottom buttons */}
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 pt-2 border-t border-black/10">
               <button
                 type="button"
-                onClick={() => setScheduleSuggestion(null)}
+                onClick={() => setAiSuggestions(null)}
                 className="flex-1 font-mono text-xs font-bold border-2 border-black rounded p-2.5 bg-gray-100 hover:bg-gray-200 text-zinc-800 text-center cursor-pointer"
               >
-                DISCARD SUGGESTION
+                DISCARD ALL
               </button>
 
               <button
                 type="button"
-                onClick={handleAddSuggestedItem}
-                className="flex-1 font-mono text-xs font-bold border-2 border-black rounded p-2.5 bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-center cursor-pointer flex items-center justify-center gap-1"
+                onClick={handleRegisterSelected}
+                disabled={aiSuggestions.tasks.filter(t => t.selected).length === 0 && aiSuggestions.calendarEvents.filter(e => e.selected).length === 0}
+                className="flex-1 font-mono text-xs font-bold border-2 border-black rounded p-2.5 bg-emerald-200 hover:bg-emerald-300 disabled:bg-zinc-100 disabled:text-zinc-400 disabled:border-zinc-300 disabled:cursor-not-allowed text-emerald-950 text-center cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Check className="w-4 h-4 shrink-0" />
-                <span>REGISTER ITEM</span>
+                <span>COMMIT ITEMS ({aiSuggestions.tasks.filter(t => t.selected).length + aiSuggestions.calendarEvents.filter(e => e.selected).length})</span>
               </button>
             </div>
           </div>
