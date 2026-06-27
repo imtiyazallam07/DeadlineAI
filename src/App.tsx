@@ -546,10 +546,51 @@ export default function App() {
 
     const docRef = doc(db, "users", pocketId);
     
+    // Safety fallback timeout: if we don't get any update from Firestore within 4.5 seconds,
+    // fallback to local offline mode so the user is never stuck on a loading screen.
+    const fallbackTimeout = setTimeout(() => {
+      console.warn("Firestore handshake timed out. Falling back to offline cached state.");
+      setSyncStatus("OFFLINE");
+      
+      const cached = localStorage.getItem(`session_${pocketId}`);
+      if (cached) {
+        try {
+          setSession(JSON.parse(cached));
+        } catch (e) {
+          console.error("Failed to parse cached local-first session:", e);
+        }
+      } else {
+        let seedState: UserSession;
+        if (pocketId === "PRIYA-POCKET") {
+          seedState = {
+            ...PRIYA_SAMPLE_STATE,
+            aiReport: DEFAULT_AI_REPORT_SEED,
+            updatedAt: new Date().toISOString()
+          };
+        } else {
+          seedState = {
+            userId: pocketId,
+            username: pocketId.split("-")[0] || "User",
+            tasks: [
+              { id: "starter-1", title: "Complete setup of DeadlineAI", due: "today 5pm", progress: 50, priority: "high" }
+            ],
+            calendarToday: ["2:00 PM — Demo DeadlineAI"],
+            energyLevel: "medium",
+            currentTime: "10:00 AM",
+            burnoutStreak: 0,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        setSession(seedState);
+      }
+      setLoading(false);
+    }, 4500);
+
     // Listen in real-time
     const unsubscribe = onSnapshot(
       docRef,
       async (docSnap) => {
+        clearTimeout(fallbackTimeout);
         if (docSnap.exists()) {
           setSession(docSnap.data() as UserSession);
           setSyncStatus("CONNECTED");
@@ -594,6 +635,7 @@ export default function App() {
         setLoading(false);
       },
       (error) => {
+        clearTimeout(fallbackTimeout);
         console.error("Real-time listener failed, attempting offline local-storage recovery:", error);
         setSyncStatus("OFFLINE");
         
@@ -634,7 +676,10 @@ export default function App() {
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(fallbackTimeout);
+      unsubscribe();
+    };
   }, [pocketId]);
 
   // Push updates to Firestore (triggers local state update dynamically through onSnapshot listener)
