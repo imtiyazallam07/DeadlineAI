@@ -69,7 +69,10 @@ import {
   Search,
   Filter,
   Bell,
-  BellOff
+  BellOff,
+  ListTodo,
+  Timer,
+  Notebook
 } from "lucide-react";
 
 export default function App() {
@@ -96,6 +99,9 @@ export default function App() {
   
   // UI Tabs: 0 = PLANNER, 1 = CHIEF-OF-STAFF, 2 = DEVICE SYNC
   const [activeTab, setActiveTab] = useState<number>(0);
+  
+  // Planner Sub-tabs for better non-scrolling UI
+  const [plannerSubTab, setPlannerSubTab] = useState<"tasks" | "timer" | "agenda" | "notes">("tasks");
   
   // Local task creation states
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -1466,8 +1472,48 @@ export default function App() {
                   <NotebookPaper title={`${session.username.toUpperCase()}'S DAILY PLANNING POCKET`}>
                     <div className="space-y-6">
                       
-                      {/* Section: Voice & NLP Task Capturer */}
-                      <div className="border-4 border-black bg-[#cfcfc4] p-4 rounded-lg shadow-[4px_4px_0px_#000] space-y-3">
+                      {/* Activities Sub-Navigation Menu */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black pb-4 mb-2">
+                        <span className="font-mono text-[11px] font-bold text-gray-600 uppercase flex items-center gap-1">
+                          <Sliders className="w-3.5 h-3.5" />
+                          <span>PLANNER WORKSPACES:</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1.5 font-mono">
+                          {[
+                            { id: "tasks", label: "Tasks & Capture", icon: ListTodo },
+                            { id: "timer", label: "Focus Timer", icon: Timer },
+                            { id: "agenda", label: "Daily Agenda", icon: Calendar },
+                            { id: "notes", label: "Scribble Notes", icon: Notebook },
+                          ].map((sub) => {
+                            const isSelected = plannerSubTab === sub.id;
+                            const Icon = sub.icon;
+                            return (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => {
+                                  setPlannerSubTab(sub.id as any);
+                                  triggerBleep();
+                                }}
+                                className={`px-3 py-1.5 border-2 border-black rounded font-mono font-bold text-[10px] sm:text-[11px] cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] flex items-center gap-1.5 text-black transition-all ${
+                                  isSelected 
+                                    ? "bg-amber-400 -translate-y-[1px]" 
+                                    : "bg-white hover:bg-zinc-50"
+                                }`}
+                              >
+                                <Icon className={`w-3.5 h-3.5 ${isSelected ? "animate-pulse text-red-600" : "text-zinc-600"}`} />
+                                <span>{sub.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* WORKSPACE CONTENT PANELS */}
+                      {plannerSubTab === "tasks" && (
+                        <div className="space-y-6">
+                          {/* Section: Voice & NLP Task Capturer */}
+                          <div className="border-4 border-black bg-[#cfcfc4] p-4 rounded-lg shadow-[4px_4px_0px_#000] space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 pb-2">
                           <h4 className="font-mono text-xs font-bold text-gray-800 uppercase flex items-center gap-1.5">
                             <Mic className="w-4 h-4 text-red-600 animate-pulse" />
@@ -1923,79 +1969,87 @@ export default function App() {
                           </div>
                         </div>
                       </form>
+                    </div>
+                  )}
 
                       {/* Section: Pomodoro Focus Timer */}
-                      <FocusTimer
-                        tasks={session.tasks}
-                        timerIsRunning={timerIsRunning}
-                        timerIsPaused={timerIsPaused}
-                        timerIntervals={timerIntervals}
-                        timerCurrentIndex={timerCurrentIndex}
-                        timerSecondsRemaining={timerSecondsRemaining}
-                        timerSelectedTaskId={timerSelectedTaskId}
-                        timerFocusHours={timerFocusHours}
-                        timerNumBreaks={timerNumBreaks}
-                        timerBreakMinutes={timerBreakMinutes}
-                        setTimerIsRunning={setTimerIsRunning}
-                        setTimerIsPaused={setTimerIsPaused}
-                        setTimerIntervals={setTimerIntervals}
-                        setTimerCurrentIndex={setTimerCurrentIndex}
-                        setTimerSecondsRemaining={setTimerSecondsRemaining}
-                        setTimerSelectedTaskId={setTimerSelectedTaskId}
-                        setTimerFocusHours={setTimerFocusHours}
-                        setTimerNumBreaks={setTimerNumBreaks}
-                        setTimerBreakMinutes={setTimerBreakMinutes}
-                        handleUpdateProgress={handleUpdateProgress}
-                        handleToggleCompleted={handleToggleCompleted}
-                        triggerBleep={triggerBleep}
-                        playTimerBeep={playTimerBeep}
-                        advanceTimer={advanceTimer}
-                      />
+                      {plannerSubTab === "timer" && (
+                        <FocusTimer
+                          tasks={session.tasks}
+                          timerIsRunning={timerIsRunning}
+                          timerIsPaused={timerIsPaused}
+                          timerIntervals={timerIntervals}
+                          timerCurrentIndex={timerCurrentIndex}
+                          timerSecondsRemaining={timerSecondsRemaining}
+                          timerSelectedTaskId={timerSelectedTaskId}
+                          timerFocusHours={timerFocusHours}
+                          timerNumBreaks={timerNumBreaks}
+                          timerBreakMinutes={timerBreakMinutes}
+                          setTimerIsRunning={setTimerIsRunning}
+                          setTimerIsPaused={setTimerIsPaused}
+                          setTimerIntervals={setTimerIntervals}
+                          setTimerCurrentIndex={setTimerCurrentIndex}
+                          setTimerSecondsRemaining={setTimerSecondsRemaining}
+                          setTimerSelectedTaskId={setTimerSelectedTaskId}
+                          setTimerFocusHours={setTimerFocusHours}
+                          setTimerNumBreaks={setTimerNumBreaks}
+                          setTimerBreakMinutes={setTimerBreakMinutes}
+                          handleUpdateProgress={handleUpdateProgress}
+                          handleToggleCompleted={handleToggleCompleted}
+                          triggerBleep={triggerBleep}
+                          playTimerBeep={playTimerBeep}
+                          advanceTimer={advanceTimer}
+                        />
+                      )}
 
                       {/* Section: Markdown Notes Manager */}
-                      <NotesManager
-                        session={session}
-                        updateSessionInCloud={updateSessionInCloud}
-                        triggerBleep={triggerBleep}
-                      />
+                      {plannerSubTab === "notes" && (
+                        <NotesManager
+                          session={session}
+                          updateSessionInCloud={updateSessionInCloud}
+                          triggerBleep={triggerBleep}
+                        />
+                      )}
 
                       {/* Section: Calendar Agenda */}
-                      <div className="pt-2 border-t-2 border-black">
-                        <div className="font-mono text-xs font-bold text-gray-600 border-b border-gray-400 pb-1 mb-2 uppercase tracking-wide flex justify-between">
-                          <span>📅 DAILY CALENDAR AGENDA</span>
-                          <span className="text-[10px] text-gray-500">AUTO-MERGES INTO TIME-BLOCKS</span>
-                        </div>
+                      {plannerSubTab === "agenda" && (
+                        <div className="pt-2">
+                          <div className="font-mono text-xs font-bold text-gray-600 border-b border-gray-400 pb-1 mb-2 uppercase tracking-wide flex justify-between">
+                            <span>📅 DAILY CALENDAR AGENDA</span>
+                            <span className="text-[10px] text-gray-500">AUTO-MERGES INTO TIME-BLOCKS</span>
+                          </div>
 
-                        <div className="space-y-2">
-                          {session.calendarToday.map((item, index) => (
-                            <div key={index} className="flex justify-between items-center bg-[#f3f2e4] border border-black p-2 rounded text-sm font-mono font-medium">
-                              <span className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-zinc-600" />
-                                {item}
-                              </span>
-                              <button
-                                onClick={() => handleDeleteCalEvent(index)}
-                                className="text-gray-400 hover:text-red-600 cursor-pointer"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
+                          <div className="space-y-2">
+                            {session.calendarToday.map((item, index) => (
+                              <div key={index} className="flex justify-between items-center bg-[#f3f2e4] border border-black p-2 rounded text-sm font-mono font-medium">
+                                <span className="flex items-center gap-2">
+                                  <Calendar className="w-4 h-4 text-zinc-600" />
+                                  {item}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteCalEvent(index)}
+                                  className="text-gray-400 hover:text-red-600 cursor-pointer"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
 
-                          <form onSubmit={handleAddCalEvent} className="flex gap-2">
-                            <input
-                              type="text"
-                              value={newCalEvent}
-                              onChange={(e) => setNewCalEvent(e.target.value)}
-                              placeholder="3:00 PM — Team standup (30 min)"
-                              className="font-mono text-xs border-2 border-black p-2 rounded bg-[#fbfbf6] flex-1 focus:outline-none"
-                            />
-                            <SkeuoButton type="submit" variant="secondary" size="sm">
-                              PLUG IN
-                            </SkeuoButton>
-                          </form>
+                            <form onSubmit={handleAddCalEvent} className="flex gap-2">
+                              <input
+                                type="text"
+                                value={newCalEvent}
+                                onChange={(e) => setNewCalEvent(e.target.value)}
+                                placeholder="3:00 PM — Team standup (30 min)"
+                                className="font-mono text-xs border-2 border-black p-2 rounded bg-[#fbfbf6] flex-1 focus:outline-none"
+                              />
+                              <SkeuoButton type="submit" variant="secondary" size="sm">
+                                PLUG IN
+                              </SkeuoButton>
+                            </form>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                     </div>
                   </NotebookPaper>
