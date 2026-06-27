@@ -680,7 +680,7 @@ export default function App() {
       clearTimeout(fallbackTimeout);
       unsubscribe();
     };
-  }, [pocketId]);
+  }, [user, pocketId]);
 
   // Push updates to Firestore (triggers local state update dynamically through onSnapshot listener)
   const updateSessionInCloud = async (updatedFields: Partial<UserSession>) => {
