@@ -680,7 +680,7 @@ export default function App() {
       clearTimeout(fallbackTimeout);
       unsubscribe();
     };
-  }, [user, pocketId]);
+  }, [pocketId, user]);
 
   // Push updates to Firestore (triggers local state update dynamically through onSnapshot listener)
   const updateSessionInCloud = async (updatedFields: Partial<UserSession>) => {
@@ -2471,7 +2471,18 @@ export default function App() {
                       </div>
 
                       {/* Informational Guidelines on design & features */}
-                      
+                      <div className="border-2 border-black bg-yellow-50 p-4 rounded text-xs font-mono text-yellow-900 space-y-2">
+                        <div className="font-bold border-b border-yellow-200 pb-1 flex items-center gap-1">
+                          <HelpCircle className="w-3.5 h-3.5" />
+                          DEADLINE-AI HIGHLIGHTS
+                        </div>
+                        <ul className="list-disc pl-4 space-y-1 leading-relaxed">
+                          <li><strong>Zero-Gradient Skeuomorphic Design:</strong> Every bezel, notebook page, and coil mimics classic offline personal pocket assistants (PDAs).</li>
+                          <li><strong>Crisis Rescue Mode:</strong> Triggers immediately when low-progress tasks near their deadline. Provides an incremental actionable solution.</li>
+                          <li><strong>Empathetic Tone Adaptation:</strong> Adjusts from comforting and decompressed ("Low Energy") to highly sharp and aggressive ("High Energy").</li>
+                          <li><strong>Real-time Synchronized Base:</strong> Fully backed by persistent Firestore sync for immediate cross-tab mirroring.</li>
+                        </ul>
+                      </div>
 
                     </div>
                   </NotebookPaper>

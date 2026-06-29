@@ -32,6 +32,31 @@ function getGeminiClient(): GoogleGenAI {
   return aiInstance;
 }
 
+// Generate content with model fallback to handle 503 errors and high demand gracefully.
+async function generateContentWithFallback(ai: GoogleGenAI, params: {
+  contents: any;
+  config?: any;
+}) {
+  const models = ["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"];
+  let lastError: any = null;
+
+  for (const model of models) {
+    try {
+      console.log(`[DeadlineAI GenAI] Attempting call with model: ${model}`);
+      const response = await ai.models.generateContent({
+        ...params,
+        model,
+      });
+      console.log(`[DeadlineAI GenAI] Success with model: ${model}`);
+      return response;
+    } catch (err: any) {
+      console.warn(`[DeadlineAI GenAI] Model ${model} failed:`, err.message || err);
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
 // DeadlineAI triage API endpoint
 app.post("/api/triage", async (req, res) => {
   try {
@@ -77,8 +102,7 @@ ${customInstruction || ""}
 
 Analyze the user's situation and generate a structured triage response.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+    const response = await generateContentWithFallback(ai, {
       contents: userPrompt,
       config: {
         systemInstruction: systemPrompt,
@@ -207,8 +231,7 @@ ${rawInput}
 
 Parse this text into clean, actionable, high-productivity objects.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+    const response = await generateContentWithFallback(ai, {
       contents: userPrompt,
       config: {
         systemInstruction: systemPrompt,

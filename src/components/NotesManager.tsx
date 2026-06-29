@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Note, Task, UserSession } from "../types";
 import SkeuoButton from "./SkeuoButton";
 import { 
@@ -628,7 +627,6 @@ export default function NotesManager({
               <div className="markdown-body p-4 overflow-auto max-h-56 min-h-56 text-zinc-800 text-xs font-mono space-y-2 select-text leading-relaxed">
                 {editorContent.trim() ? (
                   <Markdown
-                    remarkPlugins={[remarkGfm]}
                     components={{
                       h1: ({ node, ...props }) => <h1 className="text-base font-bold mt-3 mb-1.5 border-b-2 border-black pb-0.5 text-black uppercase" {...props} />,
                       h2: ({ node, ...props }) => <h2 className="text-sm font-bold mt-2.5 mb-1 border-b border-black/10 pb-0.5 text-zinc-900 uppercase" {...props} />,
@@ -645,16 +643,6 @@ export default function NotesManager({
                           {children}
                         </code>
                       ),
-                      table: ({ node, ...props }) => (
-                        <div className="overflow-x-auto my-3">
-                          <table className="min-w-full divide-y-2 divide-black border-2 border-black bg-white text-left text-[11px] font-mono shadow-[2px_2px_0px_#000]" {...props} />
-                        </div>
-                      ),
-                      thead: ({ node, ...props }) => <thead className="bg-[#cfcfc4] text-black" {...props} />,
-                      tbody: ({ node, ...props }) => <tbody className="divide-y divide-black/20" {...props} />,
-                      tr: ({ node, ...props }) => <tr className="hover:bg-zinc-50 transition-colors" {...props} />,
-                      th: ({ node, ...props }) => <th className="px-3 py-2 font-bold uppercase text-zinc-900 border-r border-black last:border-r-0" {...props} />,
-                      td: ({ node, ...props }) => <td className="px-3 py-1.5 text-zinc-700 border-r border-black/20 last:border-r-0" {...props} />,
                     }}
                   >
                     {editorContent}
